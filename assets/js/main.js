@@ -1,60 +1,51 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Determine path prefix based on depth
-    const pathDepth = window.location.pathname.split('/').filter(p => p !== '').length;
-    // Handle the case where we might be at root but with a trailing slash or just /index.html
-    // If we are at root, depth is 0 or 1 (for /index.html)
-    // If we are in services/, depth is 2 (for /services/mechanical-engineering.html)
+    // Determine path prefix based on current file location
+    // We check if 'services/' is in the path to determine if we are in a subdirectory
     const isSubPage = window.location.pathname.includes('/services/');
     const prefix = isSubPage ? '../' : '';
 
-    // Component Loading
-    const loadComponent = async (id, path) => {
-        const element = document.getElementById(id);
+    async function loadComponent(elementId, componentPath) {
+        const element = document.getElementById(elementId);
         if (!element) return;
 
         try {
-            const response = await fetch(path);
-            if (response.ok) {
-                let html = await response.text();
+            const response = await fetch(componentPath);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            let html = await response.text();
 
-                // Adjust paths in the loaded HTML for sub-pages
-                if (isSubPage) {
-                    html = html.replace(/href="(?!http|https|#|\/)/g, 'href="../');
-                    html = html.replace(/src="(?!http|https|\/)/g, 'src="../');
-                    // Special case for absolute root paths starting with /
-                    html = html.replace(/href="\//g, 'href="../');
-                    html = html.replace(/src="\//g, 'src="../');
-                } else {
-                    // Just remove the leading / for root pages to keep them relative
-                    html = html.replace(/href="\//g, 'href="');
-                    html = html.replace(/src="\//g, 'src="');
-                }
+            // Adjust internal links and image sources for sub-pages
+            if (isSubPage) {
+                // Prepend ../ to src and href that don't start with http, #, tel:, mailto:
+                html = html.replace(/(src|href)="(?!(http|#|tel:|mailto:|\.\.\/))([^"]+)"/g, '$1="../$3"');
+            }
 
-                element.innerHTML = html;
+            element.innerHTML = html;
 
-                if (id === 'main-header') {
-                    initMenuToggle();
-                }
+            // Re-initialize menu toggle if the header was loaded
+            if (elementId === 'main-header') {
+                initMenuToggle();
             }
         } catch (error) {
-            console.error(`Error loading component from ${path}:`, error);
+            console.error(`Error loading component from ${componentPath}:`, error);
         }
-    };
+    }
 
-    const initMenuToggle = () => {
+    function initMenuToggle() {
         const menuToggle = document.getElementById('menu-toggle');
         const mobileMenu = document.getElementById('mobile-menu');
 
         if (menuToggle && mobileMenu) {
-            menuToggle.addEventListener('click', () => {
+            // Remove existing listener if any to avoid duplicates
+            const newMenuToggle = menuToggle.cloneNode(true);
+            menuToggle.parentNode.replaceChild(newMenuToggle, menuToggle);
+
+            newMenuToggle.addEventListener('click', () => {
                 mobileMenu.classList.toggle('hidden');
             });
         }
-    };
+    }
 
-    // Load components using relative paths
-    loadComponent('main-header', prefix + 'assets/components/header.html');
-    loadComponent('main-footer', prefix + 'assets/components/footer.html');
-
-    initMenuToggle();
+    // Load components
+    loadComponent('main-header', `${prefix}assets/components/header.html`);
+    loadComponent('main-footer', `${prefix}assets/components/footer.html`);
 });
